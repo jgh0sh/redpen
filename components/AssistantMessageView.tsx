@@ -44,7 +44,7 @@ export function AssistantMessageView({
     return () => clearTimeout(timeout);
   }, [pulseAnnotationId]);
 
-  const handleMouseUp = () => {
+  const handleSelection = () => {
     if (!isAnnotateMode || !contentRef.current) return;
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
@@ -91,7 +91,9 @@ export function AssistantMessageView({
         <div
           ref={contentRef}
           className="message-content assistant-content"
-          onMouseUp={handleMouseUp}
+          onMouseUp={handleSelection}
+          onPointerUp={handleSelection}
+          onTouchEnd={() => setTimeout(handleSelection, 0)}
           data-message-id={message.id}
         >
           {segments.map((segment, index) =>
