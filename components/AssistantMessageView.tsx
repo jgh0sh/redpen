@@ -56,6 +56,14 @@ export function AssistantMessageView({
         return;
       }
 
+      if (
+        !contentRef.current!.contains(range.startContainer) ||
+        !contentRef.current!.contains(range.endContainer)
+      ) {
+        onClearSelection();
+        return;
+      }
+
       const offsets = getOffsetsFromRange(contentRef.current!, range);
       if (!offsets || offsets.start === offsets.end) {
         onClearSelection();
