@@ -122,7 +122,7 @@ function getOffsetsFromRange(
   try {
     const measure = (node: Node, offset: number) => {
       const r = document.createRange();
-      r.setStart(container, 0);
+      r.selectNodeContents(container);
       r.setEnd(node, offset);
       return r.toString().length;
     };
