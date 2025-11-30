@@ -29,9 +29,10 @@ function generateId() {
 const SAMPLE_MESSAGE: AssistantMessage = {
   id: "m1",
   html: `
-  <p>Yes it is! This is a sample assistant reply. Try selecting text to open the “Ask ChatGPT” bubble, add a short note, and it will be highlighted in-line.</p>
-  <p>You can add multiple disjoint selections; they all flow into the chat box at the bottom so you can send a single follow-up with context.</p>
-  <p>Click a highlight to jump to it, edit the note, or remove it. Clearing everything resets the chat box too.</p>
+  <p>Welcome to the RedPen demo.</p>
+  <p>Select any text to pop the “Ask ChatGPT” button, add a note, and it will be saved as a highlight.</p>
+  <p>You can create multiple disjoint highlights; each appears as a preview chip above the Ask box and is included when you send.</p>
+  <p>Click a highlight to edit or delete the note. Sending will bundle the notes with your prompt.</p>
   `,
 };
 
@@ -49,11 +50,14 @@ export function ChatExperience() {
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
   const [selectedText, setSelectedText] = useState<string>("");
-  const [conversation, setConversation] = useState<{ role: "user" | "assistant"; content: string }[]>(
-    [{ role: "assistant", content: stripHtmlToPlainText(SAMPLE_MESSAGE.html) }]
-  );
+  type ChatEntry = { id: string; role: "user" | "assistant"; content: string; pending?: boolean };
+  const [conversation, setConversation] = useState<ChatEntry[]>([
+    { id: SAMPLE_MESSAGE.id, role: "assistant", content: stripHtmlToPlainText(SAMPLE_MESSAGE.html) },
+  ]);
   const [isSending, setIsSending] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
   const isAnnotateMode = true;
@@ -192,13 +196,25 @@ export function ChatExperience() {
 
     if (!fullUserMessage) return;
 
+    const userEntry: ChatEntry = { id: generateId(), role: "user", content: fullUserMessage };
+    const pendingAssistant: ChatEntry = {
+      id: generateId(),
+      role: "assistant",
+      content: "Thinking",
+      pending: true,
+    };
+
+    const nextConversation = [...conversation, userEntry, pendingAssistant];
+    setConversation(nextConversation);
+    setComposerValue("");
     setIsSending(true);
-    const nextConversation = [...conversation, { role: "user" as const, content: fullUserMessage }];
+
+    const apiConversation = [...conversation, { role: "user" as const, content: fullUserMessage }];
 
     fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: nextConversation }),
+      body: JSON.stringify({ messages: apiConversation }),
     })
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to reach model");
@@ -207,12 +223,17 @@ export function ChatExperience() {
         if (!assistantText) throw new Error("Empty response");
 
         const assistantHtml = textToHtml(assistantText);
-        const newMessage: AssistantMessage = { id: generateId(), html: assistantHtml };
+        const newMessage: AssistantMessage = { id: pendingAssistant.id, html: assistantHtml };
 
-        setConversation([...nextConversation, { role: "assistant", content: assistantText }]);
+        setConversation((current) =>
+          current.map((entry) =>
+            entry.id === pendingAssistant.id
+              ? { ...entry, content: assistantText, pending: false }
+              : entry
+          )
+        );
         setMessage(newMessage);
         setAnnotations([]);
-        setComposerValue("");
         setToolbarMode("cta");
         setSelectedText("");
       })
@@ -233,27 +254,93 @@ export function ChatExperience() {
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [toolbarPosition]);
 
+  useEffect(() => {
+    const el = chatContainerRef.current;
+    const sentinel = bottomRef.current;
+    if (!el || !sentinel) return;
+
+    const frames: number[] = [];
+
+    const animate = (cb: () => void) => {
+      const id = requestAnimationFrame(cb);
+      frames.push(id);
+    };
+
+    animate(() => smoothScroll(el, el.scrollHeight, 650));
+
+    const scrollingEl = document.scrollingElement;
+    if (scrollingEl) {
+      animate(() => smoothScroll(scrollingEl, scrollingEl.scrollHeight, 650));
+    } else {
+      animate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" }));
+    }
+
+    return () => frames.forEach(cancelAnimationFrame);
+  }, [conversation, annotations]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [conversation]);
+
   return (
     <main>
       <h1 style={{ display: "none" }}>Ask ChatGPT with highlights</h1>
-      <div className="chat-container">
-        <div className="chat-message right-bubble">
-          <div className="message-bubble bubble-muted">
-            <div className="message-content user-content">
-              <p>{HELLO_TEXT}</p>
+      <div className="chat-container" ref={chatContainerRef}>
+        {conversation.map((entry) => {
+          if (entry.role === "user") {
+            return (
+              <div className="chat-message right-bubble" key={entry.id}>
+                <div className="message-bubble bubble-muted">
+                  <div className="message-content user-content" style={{ whiteSpace: "pre-line" }}>
+                    {entry.content}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (entry.pending) {
+            return (
+              <div className="chat-message" key={entry.id}>
+                <div className="message-bubble">
+                  <div className="message-content assistant-content" style={{ whiteSpace: "pre-line" }}>
+                    <span className="thinking-text">Thinking</span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (entry.id === message.id) {
+            return (
+              <AssistantMessageView
+                key={entry.id}
+                message={message}
+                annotations={annotations}
+                messagePlainText={messagePlainText}
+                isAnnotateMode={isAnnotateMode}
+                onSelectRange={handleSelectRange}
+                onClearSelection={clearSelection}
+                onAnnotationClick={focusAnnotation}
+                pulseAnnotationId={pulseAnnotationId}
+              />
+            );
+          }
+
+          return (
+            <div className="chat-message" key={entry.id}>
+              <div className="message-bubble">
+                <div className="message-content assistant-content" style={{ whiteSpace: "pre-line" }}>
+                  {entry.content}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <AssistantMessageView
-          message={message}
-          annotations={annotations}
-          messagePlainText={messagePlainText}
-          isAnnotateMode={isAnnotateMode}
-          onSelectRange={handleSelectRange}
-          onClearSelection={clearSelection}
-          onAnnotationClick={focusAnnotation}
-          pulseAnnotationId={pulseAnnotationId}
-        />
+          );
+        })}
+        <div ref={bottomRef} />
         <InlineNoteToolbar
           noteText={toolbarNoteText}
           position={toolbarPosition}
@@ -274,6 +361,7 @@ export function ChatExperience() {
           annotations={annotations}
           messagePlainText={messagePlainText}
           onDeleteAnnotation={deleteAnnotation}
+          isSending={isSending}
         />
       </div>
     </main>
@@ -284,4 +372,22 @@ function textToHtml(text: string): string {
   const paragraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   if (!paragraphs.length) return `<p>${text}</p>`;
   return paragraphs.map((p) => `<p>${p}</p>`).join("");
+}
+
+function smoothScroll(element: HTMLElement, target: number, duration = 600) {
+  const start = element.scrollTop;
+  const change = target - start;
+  const startTime = performance.now();
+
+  const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
+
+  const step = () => {
+    const now = performance.now();
+    const elapsed = Math.min((now - startTime) / duration, 1);
+    const eased = easeInOut(elapsed);
+    element.scrollTop = start + change * eased;
+    if (elapsed < 1) requestAnimationFrame(step);
+  };
+
+  requestAnimationFrame(step);
 }

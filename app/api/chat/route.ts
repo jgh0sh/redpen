@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "openai/gpt-oss-20b:free",
         messages,
         temperature: 0.7,
       }),
@@ -28,8 +28,10 @@ export async function POST(req: NextRequest) {
 
     if (!completionRes.ok) {
       const body = await completionRes.text();
-      return new Response(JSON.stringify({ error: body || "Upstream error" }), {
-        status: 502,
+      const fallback =
+        "I'm rate limited right now, but you can still select this text to try the RedPen annotation flow.";
+      return new Response(JSON.stringify({ message: fallback, error: body || "Upstream error" }), {
+        status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }

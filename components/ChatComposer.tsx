@@ -79,6 +79,12 @@ export function ChatComposer({
         ref={textareaRef}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            onSend();
+          }
+        }}
         placeholder="Ask anything"
       />
       <div className="composer-actions">
