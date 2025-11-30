@@ -163,9 +163,7 @@ export function ChatExperience() {
     }
   };
 
-  const sendPrompt = () => {
-    alert("Pretend to send:\n\n" + composerValue);
-  };
+  const sendPrompt = () => {};
 
   useEffect(() => {
     if (!toolbarPosition) return;
