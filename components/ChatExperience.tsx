@@ -50,7 +50,13 @@ export function ChatExperience() {
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
   const [selectedText, setSelectedText] = useState<string>("");
-  type ChatEntry = { id: string; role: "user" | "assistant"; content: string; pending?: boolean };
+  type ChatEntry = {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    pending?: boolean;
+    createdAt?: number;
+  };
   const [conversation, setConversation] = useState<ChatEntry[]>([
     { id: SAMPLE_MESSAGE.id, role: "assistant", content: stripHtmlToPlainText(SAMPLE_MESSAGE.html) },
   ]);
@@ -197,11 +203,13 @@ export function ChatExperience() {
     if (!fullUserMessage) return;
 
     const userEntry: ChatEntry = { id: generateId(), role: "user", content: fullUserMessage };
+    const pendingCreatedAt = Date.now();
     const pendingAssistant: ChatEntry = {
       id: generateId(),
       role: "assistant",
       content: "Thinking",
       pending: true,
+      createdAt: pendingCreatedAt,
     };
 
     const nextConversation = [...conversation, userEntry, pendingAssistant];
@@ -225,22 +233,41 @@ export function ChatExperience() {
         const assistantHtml = textToHtml(assistantText);
         const newMessage: AssistantMessage = { id: pendingAssistant.id, html: assistantHtml };
 
-        setConversation((current) =>
-          current.map((entry) =>
-            entry.id === pendingAssistant.id
-              ? { ...entry, content: assistantText, pending: false }
-              : entry
-          )
-        );
-        setMessage(newMessage);
-        setAnnotations([]);
-        setToolbarMode("cta");
-        setSelectedText("");
+        const finalize = () => {
+          setConversation((current) =>
+            current.map((entry) =>
+              entry.id === pendingAssistant.id
+                ? { ...entry, content: assistantText, pending: false }
+                : entry
+            )
+          );
+          setMessage(newMessage);
+          setAnnotations([]);
+          setToolbarMode("cta");
+          setSelectedText("");
+          setIsSending(false);
+        };
+
+        const elapsed = Date.now() - pendingCreatedAt;
+        const wait = Math.max(0, 2000 - elapsed);
+        setTimeout(finalize, wait);
       })
       .catch(() => {
-        // ignore errors for now
-      })
-      .finally(() => setIsSending(false));
+        const fallback = "I'm rate limited right now, but you can still select this text.";
+        const finalize = () => {
+          setConversation((current) =>
+            current.map((entry) =>
+              entry.id === pendingAssistant.id
+                ? { ...entry, content: fallback, pending: false }
+                : entry
+            )
+          );
+          setIsSending(false);
+        };
+        const elapsed = Date.now() - pendingCreatedAt;
+        const wait = Math.max(0, 2000 - elapsed);
+        setTimeout(finalize, wait);
+      });
   };
 
   useEffect(() => {
@@ -269,8 +296,9 @@ export function ChatExperience() {
     animate(() => smoothScroll(el, el.scrollHeight, 650));
 
     const scrollingEl = document.scrollingElement;
-    if (scrollingEl) {
-      animate(() => smoothScroll(scrollingEl, scrollingEl.scrollHeight, 650));
+    if (scrollingEl && "scrollTop" in scrollingEl) {
+      const targetEl = scrollingEl as HTMLElement;
+      animate(() => smoothScroll(targetEl, targetEl.scrollHeight, 650));
     } else {
       animate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" }));
     }
