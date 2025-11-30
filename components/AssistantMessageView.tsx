@@ -143,33 +143,22 @@ function getOffsetsFromRange(
   container: HTMLElement,
   range: Range
 ): { start: number; end: number } | null {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-  let current: Node | null = walker.currentNode;
-  let index = 0;
-  let start: number | null = null;
-  let end: number | null = null;
+  try {
+    const preRange = document.createRange();
+    preRange.setStart(container, 0);
 
-  while (current) {
-    const length = current.textContent?.length ?? 0;
+    const startRange = preRange.cloneRange();
+    startRange.setEnd(range.startContainer, range.startOffset);
+    const start = startRange.toString().length;
 
-    if (current === range.startContainer) {
-      start = index + range.startOffset;
-    }
+    const endRange = preRange.cloneRange();
+    endRange.setEnd(range.endContainer, range.endOffset);
+    const end = endRange.toString().length;
 
-    if (current === range.endContainer) {
-      end = index + range.endOffset;
-      if (start !== null) break;
-    }
-
-    index += length;
-    current = walker.nextNode();
-  }
-
-  if (start === null || end === null) {
+    return start <= end ? { start, end } : { start: end, end: start };
+  } catch {
     return null;
   }
-
-  return start <= end ? { start, end } : { start: end, end: start };
 }
 
 function buildSegments(
