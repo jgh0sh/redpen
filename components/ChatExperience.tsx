@@ -434,14 +434,12 @@ export function ChatExperience() {
           disabled={!pendingRange}
           tooltip={selectionError}
           isMobile={isMobile}
-          previewSnippet={selectedText}
-          forceModal={showMobileModal}
-          onCancel={() => {
-            setShowMobileModal(false);
-            setToolbarMode("cta");
-            setPendingRange(null);
-          }}
-        />
+        previewSnippet={selectedText}
+        forceModal={showMobileModal}
+        onCancel={() => {
+          clearSelection();
+        }}
+      />
         <ChatComposer
           value={composerValue}
           onChange={setComposerValue}
