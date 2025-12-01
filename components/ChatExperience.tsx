@@ -35,10 +35,7 @@ const SAMPLE_MESSAGE: AssistantMessage = {
   `,
 };
 
-const HELLO_TEXT = "hello, is this the chat redpen demo?";
-
 export function ChatExperience() {
-  const [message, setMessage] = useState<AssistantMessage>(SAMPLE_MESSAGE);
   const [activeMessageId, setActiveMessageId] = useState<string>(SAMPLE_MESSAGE.id);
   const [activeMessagePlainText, setActiveMessagePlainText] = useState<string>(
     stripHtmlToPlainText(SAMPLE_MESSAGE.html)
@@ -49,7 +46,6 @@ export function ChatExperience() {
   const [pendingRange, setPendingRange] = useState<{ start: number; end: number } | null>(null);
   const [toolbarPosition, setToolbarPosition] = useState<{ top: number; left: number } | null>(null);
   const [toolbarNoteText, setToolbarNoteText] = useState("");
-  const [selectionError, setSelectionError] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState<string>("");
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
   const [selectedText, setSelectedText] = useState<string>("");
@@ -74,7 +70,6 @@ export function ChatExperience() {
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [showMobileModal, setShowMobileModal] = useState(false);
 
   const isAnnotateMode = true;
   const allAnnotations = useMemo(
@@ -86,10 +81,8 @@ export function ChatExperience() {
     setPendingRange(null);
     setToolbarPosition(null);
     setToolbarNoteText("");
-    setSelectionError(null);
     setToolbarMode("cta");
     setSelectedText("");
-    setShowMobileModal(false);
     const selection = window.getSelection();
     selection?.removeAllRanges();
   };
@@ -101,7 +94,6 @@ export function ChatExperience() {
     targetMessageId: string,
     targetPlainText: string
   ) => {
-    setSelectionError(null);
     setPendingRange(range);
     setToolbarPosition(position);
     setActiveMessageId(targetMessageId);
@@ -109,7 +101,6 @@ export function ChatExperience() {
     setToolbarMode("cta");
     setToolbarNoteText("");
     setSelectedText(selected);
-    setShowMobileModal(false);
   };
 
   const saveAnnotation = () => {
@@ -142,7 +133,6 @@ export function ChatExperience() {
   };
 
   const beginNote = () => {
-    setShowMobileModal(isMobile);
     setToolbarMode("note");
   };
 
@@ -184,8 +174,6 @@ export function ChatExperience() {
     setPendingRange(null);
     setToolbarPosition(null);
     setToolbarNoteText("");
-    setSelectionError(null);
-    setShowMobileModal(false);
 
     const userEntry: ChatEntry = { id: generateId(), role: "user", content: fullUserMessage };
     const pendingCreatedAt = Date.now();
@@ -226,10 +214,9 @@ export function ChatExperience() {
                 : entry
             )
           );
-          setMessage(newMessage);
           setActiveMessageId(newMessage.id);
           setActiveMessagePlainText(stripHtmlToPlainText(newMessage.html));
-          setAnnotationsByMessage((current) => ({
+          setAnnotationsByMessage(() => ({
             [newMessage.id]: [],
           }));
           setToolbarMode("cta");
@@ -237,8 +224,6 @@ export function ChatExperience() {
           setPendingRange(null);
           setToolbarPosition(null);
           setToolbarNoteText("");
-          setSelectionError(null);
-          setShowMobileModal(false);
           setIsSending(false);
         };
 
@@ -256,17 +241,14 @@ export function ChatExperience() {
                 : entry
             )
           );
-          setMessage({ id: pendingAssistant.id, html: textToHtml(fallback) });
           setActiveMessageId(pendingAssistant.id);
           setActiveMessagePlainText(fallback);
-          setAnnotationsByMessage((current) => ({
+          setAnnotationsByMessage(() => ({
             [pendingAssistant.id]: [],
           }));
           setPendingRange(null);
           setToolbarPosition(null);
           setToolbarNoteText("");
-          setSelectionError(null);
-          setShowMobileModal(false);
           setIsSending(false);
         };
         const elapsed = Date.now() - pendingCreatedAt;
@@ -327,6 +309,19 @@ export function ChatExperience() {
     return () => cancelAnimationFrame(frame);
   }, [conversation]);
 
+  if (isMobile) {
+    return (
+      <main className="mobile-notice-container">
+        <div className="mobile-notice">
+          <div className="mobile-notice-icon">💻</div>
+          <h2>Desktop Only</h2>
+          <p>This demo uses text selection features that work best on desktop browsers.</p>
+          <p>Please visit on a computer to try the full experience.</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main>
       <h1 style={{ display: "none" }}>Ask ChatGPT with highlights</h1>
@@ -382,13 +377,7 @@ export function ChatExperience() {
           onChange={setToolbarNoteText}
           onConfirm={saveAnnotation}
           disabled={!pendingRange}
-          tooltip={selectionError}
-          isMobile={isMobile}
-          previewSnippet={selectedText}
-          forceModal={showMobileModal}
-          onCancel={() => {
-            clearSelection();
-          }}
+          onCancel={clearSelection}
         />
         <ChatComposer
           value={composerValue}
