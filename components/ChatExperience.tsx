@@ -240,6 +240,16 @@ export function ChatExperience() {
 
     if (!fullUserMessage) return;
 
+    // Clear all existing annotations once we send a prompt so the next turn starts fresh.
+    setAnnotationsByMessage({});
+    setSelectedText("");
+    setPendingRange(null);
+    setToolbarPosition(null);
+    setToolbarNoteText("");
+    setEditingAnnotationId(null);
+    setSelectionError(null);
+    setShowMobileModal(false);
+
     const userEntry: ChatEntry = { id: generateId(), role: "user", content: fullUserMessage };
     const pendingCreatedAt = Date.now();
     const pendingAssistant: ChatEntry = {
@@ -283,11 +293,16 @@ export function ChatExperience() {
           setActiveMessageId(newMessage.id);
           setActiveMessagePlainText(stripHtmlToPlainText(newMessage.html));
           setAnnotationsByMessage((current) => ({
-            ...current,
-            [newMessage.id]: current[newMessage.id] ?? [],
+            [newMessage.id]: [],
           }));
           setToolbarMode("cta");
           setSelectedText("");
+          setPendingRange(null);
+          setToolbarPosition(null);
+          setToolbarNoteText("");
+          setEditingAnnotationId(null);
+          setSelectionError(null);
+          setShowMobileModal(false);
           setIsSending(false);
         };
 
@@ -309,9 +324,14 @@ export function ChatExperience() {
           setActiveMessageId(pendingAssistant.id);
           setActiveMessagePlainText(fallback);
           setAnnotationsByMessage((current) => ({
-            ...current,
-            [pendingAssistant.id]: current[pendingAssistant.id] ?? [],
+            [pendingAssistant.id]: [],
           }));
+          setPendingRange(null);
+          setToolbarPosition(null);
+          setToolbarNoteText("");
+          setEditingAnnotationId(null);
+          setSelectionError(null);
+          setShowMobileModal(false);
           setIsSending(false);
         };
         const elapsed = Date.now() - pendingCreatedAt;
