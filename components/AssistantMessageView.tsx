@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import { marked } from "marked";
+import { marked, Renderer } from "marked";
 import { Annotation, AssistantMessage } from "./types";
 
 interface SelectionPosition {
@@ -193,7 +193,7 @@ function buildSegments(
   return segments;
 }
 
-function createInlineRenderer(): marked.Renderer {
+function createInlineRenderer(): Renderer {
   const renderer = new marked.Renderer();
 
   renderer.paragraph = (text) => `<span class="md-p">${text}</span>`;
@@ -216,13 +216,11 @@ function createInlineRenderer(): marked.Renderer {
   return renderer;
 }
 
-function renderInlineMarkdown(raw: string, renderer: marked.Renderer): string {
+function renderInlineMarkdown(raw: string, renderer: Renderer): string {
   return marked.parse(raw, {
     renderer,
     gfm: true,
     breaks: true,
-    headerIds: false,
-    mangle: false,
   }) as string;
 }
 
