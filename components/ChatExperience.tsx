@@ -80,6 +80,10 @@ export function ChatExperience() {
   const messagePlainText = useMemo(() => stripHtmlToPlainText(message.html), [message.html]);
   const isAnnotateMode = true;
   const activeAnnotations = annotationsByMessage[activeMessageId] ?? [];
+  const allAnnotations = useMemo(
+    () => Object.values(annotationsByMessage).flat(),
+    [annotationsByMessage]
+  );
 
   const clearSelection = () => {
     setPendingRange(null);
@@ -165,11 +169,17 @@ export function ChatExperience() {
   };
 
   const deleteAnnotation = (id: string) => {
+    deleteAnnotationForMessage(activeMessageId, id);
+  };
+
+  const deleteAnnotationForMessage = (messageId: string, id: string) => {
     setAnnotationsByMessage((current) => {
-      const existing = current[activeMessageId] ?? [];
-      return { ...current, [activeMessageId]: existing.filter((annotation) => annotation.id !== id) };
+      const existing = current[messageId] ?? [];
+      return { ...current, [messageId]: existing.filter((annotation) => annotation.id !== id) };
     });
-    clearSelection();
+    if (messageId === activeMessageId) {
+      clearSelection();
+    }
   };
 
   const focusAnnotation = (id: string) => {
@@ -207,23 +217,20 @@ export function ChatExperience() {
   const sendPrompt = () => {
     if (isSending) return;
     const userText = composerValue.trim();
-    const noteContext =
-      activeAnnotations.length > 0
-        ? activeAnnotations
+    const allNoteContext =
+      allAnnotations.length > 0
+        ? allAnnotations
             .slice()
-            .sort((a, b) => a.start - b.start)
             .map((ann, idx) => {
-              const snippet =
-                ann.snippet && ann.snippet.length
-                  ? ann.snippet
-                  : activeMessagePlainText.slice(ann.start, ann.end);
+              const snippet = ann.snippet && ann.snippet.length ? ann.snippet : "";
               const note = ann.noteText.trim();
-              return `${idx + 1}) "${snippet}"${note ? ` — ${note}` : ""}`;
+              const label = note ? `${note}` : "";
+              return `${idx + 1}) "${snippet}"${label ? ` — ${label}` : ""}`;
             })
             .join("\n")
         : "";
 
-    const fullUserMessage = [userText, noteContext ? `Notes:\n${noteContext}` : ""]
+    const fullUserMessage = [userText, allNoteContext ? `Notes:\n${allNoteContext}` : ""]
       .filter(Boolean)
       .join("\n\n");
 
@@ -431,9 +438,8 @@ export function ChatExperience() {
           onChange={setComposerValue}
           onSend={sendPrompt}
           textareaRef={composerRef}
-          annotations={activeAnnotations}
-          messagePlainText={activeMessagePlainText}
-          onDeleteAnnotation={deleteAnnotation}
+          annotations={allAnnotations}
+          onDeleteAnnotation={(id, messageId) => deleteAnnotationForMessage(messageId, id)}
           isSending={isSending}
         />
       </div>

@@ -5,9 +5,8 @@ interface ChatComposerProps {
   onChange: (value: string) => void;
   onSend: () => void;
   textareaRef?: React.RefObject<HTMLTextAreaElement>;
-  annotations?: { id: string; start: number; end: number; noteText: string; snippet?: string }[];
-  messagePlainText?: string;
-  onDeleteAnnotation?: (id: string) => void;
+  annotations?: { id: string; noteText: string; snippet?: string; messageId: string }[];
+  onDeleteAnnotation?: (id: string, messageId: string) => void;
   isSending?: boolean;
 }
 
@@ -17,7 +16,6 @@ export function ChatComposer({
   onSend,
   textareaRef,
   annotations = [],
-  messagePlainText = "",
   onDeleteAnnotation,
   isSending = false,
 }: ChatComposerProps) {
@@ -31,10 +29,7 @@ export function ChatComposer({
     snippet?: string;
   }): { snippet: string; note: string } => {
     const noteRaw = annotation.noteText.trim();
-    const snippetRaw =
-      annotation.snippet && annotation.snippet.length
-        ? annotation.snippet
-        : messagePlainText.slice(annotation.start, annotation.end);
+    const snippetRaw = annotation.snippet && annotation.snippet.length ? annotation.snippet : "";
 
     const snippet = truncate(snippetRaw, 90);
     const note = truncate(noteRaw || "", 60);
@@ -66,7 +61,7 @@ export function ChatComposer({
                     className="chip-close"
                     type="button"
                     aria-label="Remove note"
-                    onClick={() => onDeleteAnnotation(annotation.id)}
+                    onClick={() => onDeleteAnnotation(annotation.id, annotation.messageId)}
                   >
                     ×
                   </button>
