@@ -90,8 +90,8 @@ function formatMessageWithContext(userText: string, annotations: Annotation[]): 
 const SAMPLE_MESSAGE: AssistantMessage = {
   id: "m1",
   html: `
-  <p>Welcome to the RedPen demo.</p>
-  <p>Select text, tap “Ask ChatGPT”, and add a quick note. Each highlight shows up above the Ask box.</p>
+  <p>Welcome to the RedPen demo, by Jay Ghosh.</p>
+  <p>Select text, tap "Ask ChatGPT", and add a quick note. Each highlight shows up above the Ask box.</p>
   <p>Click a highlight to edit or delete it. When you send, your prompt and all notes are bundled together.</p>
   `,
 };
