@@ -26,6 +26,67 @@ function generateId() {
   return `a-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/**
+ * Formats the user's message with highlighted context using XML-style tags.
+ * This follows RAG best practices by:
+ * 1. Clearly separating context (highlights) from the user's query
+ * 2. Using semantic XML tags that LLMs understand well
+ * 3. Preserving the relationship between excerpts and user annotations
+ */
+function formatMessageWithContext(userText: string, annotations: Annotation[]): string {
+  const hasHighlights = annotations.length > 0;
+  const hasUserText = userText.length > 0;
+
+  if (!hasHighlights && !hasUserText) {
+    return "";
+  }
+
+  // If no highlights, just return the user's message directly
+  if (!hasHighlights) {
+    return userText;
+  }
+
+  // Build the highlighted context section
+  const highlightEntries = annotations
+    .map((ann) => {
+      const excerpt = ann.snippet?.trim() || "";
+      const note = ann.noteText?.trim() || "";
+
+      if (!excerpt && !note) return null;
+
+      let entry = "<highlight>\n";
+      if (excerpt) {
+        entry += `<excerpt>${excerpt}</excerpt>\n`;
+      }
+      if (note) {
+        entry += `<annotation>${note}</annotation>\n`;
+      }
+      entry += "</highlight>";
+      return entry;
+    })
+    .filter(Boolean);
+
+  if (highlightEntries.length === 0 && !hasUserText) {
+    return "";
+  }
+
+  const parts: string[] = [];
+
+  // Add context section if there are highlights
+  if (highlightEntries.length > 0) {
+    parts.push(
+      `<highlighted_context>\n${highlightEntries.join("\n")}\n</highlighted_context>`
+    );
+  }
+
+  // Add user query section
+  if (hasUserText) {
+    parts.push(`<user_query>\n${userText}\n</user_query>`);
+  }
+
+  return parts.join("\n\n");
+}
+
 const SAMPLE_MESSAGE: AssistantMessage = {
   id: "m1",
   html: `
@@ -149,22 +210,7 @@ export function ChatExperience() {
   const sendPrompt = () => {
     if (isSending) return;
     const userText = composerValue.trim();
-    const allNoteContext =
-      allAnnotations.length > 0
-        ? allAnnotations
-            .slice()
-            .map((ann, idx) => {
-              const snippet = ann.snippet && ann.snippet.length ? ann.snippet : "";
-              const note = ann.noteText.trim();
-              const label = note ? `${note}` : "";
-              return `${idx + 1}) "${snippet}"${label ? ` — ${label}` : ""}`;
-            })
-            .join("\n")
-        : "";
-
-    const fullUserMessage = [userText, allNoteContext ? `Notes:\n${allNoteContext}` : ""]
-      .filter(Boolean)
-      .join("\n\n");
+    const fullUserMessage = formatMessageWithContext(userText, allAnnotations);
 
     if (!fullUserMessage) return;
 

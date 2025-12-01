@@ -21,7 +21,18 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-20b:free",
-        messages,
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful assistant. When the user provides context in XML tags like <highlighted_context>, <excerpt>, <annotation>, and <user_query>, understand that:
+- <excerpt> contains text the user selected/highlighted
+- <annotation> contains the user's note about that excerpt
+- <user_query> contains the user's actual question
+
+Respond naturally to the user's query, referencing the highlighted excerpts and annotations as context. Do NOT repeat the XML tags or the raw prompt back. Just answer helpfully.`
+          },
+          ...messages
+        ],
         temperature: 0.7,
       }),
     });
