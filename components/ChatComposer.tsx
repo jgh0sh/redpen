@@ -67,20 +67,20 @@ export function ChatComposer({
             ))}
         </div>
       ) : null}
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            onSend();
-          }
-        }}
-        placeholder="Ask anything"
-      />
-      <div className="composer-actions">
-        <div className="composer-actions-right">
+      <div className="composer-row">
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              onSend();
+            }
+          }}
+          placeholder="Ask anything..."
+        />
+        <div className="composer-actions">
           <button
             className="send-circle"
             onClick={onSend}
