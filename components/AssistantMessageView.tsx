@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useLayoutEffect, useMemo, useRef } from "react";
 import { marked, Renderer } from "marked";
 import { AssistantMessage } from "./types";
 
@@ -7,6 +7,7 @@ interface AssistantMessageViewProps {
   messagePlainText: string;
   isAnnotateMode: boolean;
   pendingRange?: { start: number; end: number } | null;
+  selectionRestoreKey?: number;
   onSelectRange: (
     range: { start: number; end: number },
     position: { top: number; left: number },
@@ -20,31 +21,26 @@ export function AssistantMessageView({
   messagePlainText,
   isAnnotateMode,
   pendingRange = null,
+  selectionRestoreKey = 0,
   onSelectRange,
   onClearSelection,
 }: AssistantMessageViewProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const markdownRenderer = useMemo(() => createInlineRenderer(), []);
-  const [pendingRects, setPendingRects] = useState<
-    { top: number; left: number; width: number; height: number }[]
-  >([]);
   const selectionProcessedRef = useRef(false);
 
-  useEffect(() => {
-    if (!pendingRange) {
-      setPendingRects([]);
-    }
-  }, [pendingRange]);
+  useLayoutEffect(() => {
+    if (!pendingRange || !contentRef.current) return;
 
-  // Clear native selection after custom overlay is rendered to avoid double-highlight
-  useEffect(() => {
-    if (pendingRects.length > 0) {
-      requestAnimationFrame(() => {
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-      });
-    }
-  }, [pendingRects]);
+    const range = getRangeFromOffsets(contentRef.current, pendingRange);
+    if (!range) return;
+
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, [pendingRange, selectionRestoreKey]);
 
   const handleSelectionStart = () => {
     selectionProcessedRef.current = false;
@@ -115,14 +111,6 @@ export function AssistantMessageView({
       };
 
       const selectedText = rawRange.toString();
-      const containerRect = contentRef.current!.getBoundingClientRect();
-      const rects = Array.from(rawRange.getClientRects()).map((r) => ({
-        top: r.top - containerRect.top + (contentRef.current?.scrollTop ?? 0),
-        left: r.left - containerRect.left + (contentRef.current?.scrollLeft ?? 0),
-        width: r.width,
-        height: r.height,
-      }));
-      setPendingRects(rects);
       if (process.env.NODE_ENV === "development") {
         // eslint-disable-next-line no-console
         console.log("Selection debug", {
@@ -154,13 +142,6 @@ export function AssistantMessageView({
           data-message-id={message.id}
         >
           <span dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(messagePlainText, markdownRenderer) }} />
-          {pendingRects.map((r, idx) => (
-            <span
-              key={`pending-rect-${idx}`}
-              className="pending-highlight-rect"
-              style={{ top: r.top, left: r.left, width: r.width, height: r.height }}
-            />
-          ))}
         </div>
       </div>
     </div>
@@ -191,6 +172,38 @@ function getOffsetsFromRange(
   } catch {
     return null;
   }
+}
+
+function getRangeFromOffsets(
+  container: HTMLElement,
+  offsets: { start: number; end: number }
+): Range | null {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let currentOffset = 0;
+  let startSet = false;
+  let endSet = false;
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const length = node.textContent?.length ?? 0;
+    const nextOffset = currentOffset + length;
+
+    if (!startSet && offsets.start <= nextOffset) {
+      range.setStart(node, Math.max(0, offsets.start - currentOffset));
+      startSet = true;
+    }
+
+    if (!endSet && offsets.end <= nextOffset) {
+      range.setEnd(node, Math.max(0, offsets.end - currentOffset));
+      endSet = true;
+      break;
+    }
+
+    currentOffset = nextOffset;
+  }
+
+  return startSet && endSet ? range : null;
 }
 
 

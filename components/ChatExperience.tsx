@@ -26,6 +26,11 @@ function generateId() {
   return `a-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function truncateText(text: string, limit: number) {
+  const trimmed = text.trim();
+  return trimmed.length > limit ? `${trimmed.slice(0, limit - 1).trimEnd()}…` : trimmed;
+}
+
 /**
  * Formats the user's message with highlighted context using XML-style tags.
  * This follows RAG best practices by:
@@ -92,11 +97,17 @@ const SAMPLE_MESSAGE: AssistantMessage = {
   html: `
   <p>Welcome to the RedPen demo.</p>
   <p>Select text, tap "Ask ChatGPT", and add a quick note. Each highlight shows up above the Ask box.</p>
-  <p>Click a highlight to edit or delete it. When you send, your prompt and all notes are bundled together.</p>
+  <p>Click the "X" on a note to delete it. When you send, your prompt and all notes are bundled together.</p>
   `,
 };
 
 export function ChatExperience() {
+  type UserContextPreview = {
+    id: string;
+    noteText: string;
+    snippet?: string;
+  };
+
   const [activeMessageId, setActiveMessageId] = useState<string>(SAMPLE_MESSAGE.id);
   const [activeMessagePlainText, setActiveMessagePlainText] = useState<string>(
     stripHtmlToPlainText(SAMPLE_MESSAGE.html)
@@ -109,11 +120,15 @@ export function ChatExperience() {
   const [toolbarNoteText, setToolbarNoteText] = useState("");
   const [composerValue, setComposerValue] = useState<string>("");
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
+  const [selectionRestoreKey, setSelectionRestoreKey] = useState(0);
   const [selectedText, setSelectedText] = useState<string>("");
+  const [expandedContextByMessage, setExpandedContextByMessage] = useState<Record<string, boolean>>({});
   type ChatEntry = {
     id: string;
     role: "user" | "assistant";
     content: string;
+    displayContent?: string;
+    contextPreviews?: UserContextPreview[];
     html?: string;
     pending?: boolean;
     createdAt?: number;
@@ -144,6 +159,7 @@ export function ChatExperience() {
     setToolbarNoteText("");
     setToolbarMode("cta");
     setSelectedText("");
+    setSelectionRestoreKey((key) => key + 1);
     const selection = window.getSelection();
     selection?.removeAllRanges();
   };
@@ -162,6 +178,7 @@ export function ChatExperience() {
     setToolbarMode("cta");
     setToolbarNoteText("");
     setSelectedText(selected);
+    setSelectionRestoreKey((key) => key + 1);
   };
 
   const saveAnnotation = () => {
@@ -195,6 +212,7 @@ export function ChatExperience() {
 
   const beginNote = () => {
     setToolbarMode("note");
+    setSelectionRestoreKey((key) => key + 1);
   };
 
   const deleteAnnotationForMessage = (messageId: string, id: string) => {
@@ -221,7 +239,19 @@ export function ChatExperience() {
     setToolbarPosition(null);
     setToolbarNoteText("");
 
-    const userEntry: ChatEntry = { id: generateId(), role: "user", content: fullUserMessage };
+    const userEntryId = generateId();
+    const contextPreviews = allAnnotations.map((annotation) => ({
+      id: annotation.id,
+      noteText: annotation.noteText,
+      snippet: annotation.snippet,
+    }));
+    const userEntry: ChatEntry = {
+      id: userEntryId,
+      role: "user",
+      content: fullUserMessage,
+      displayContent: userText || "Ask about the selected context",
+      contextPreviews,
+    };
     const pendingCreatedAt = Date.now();
     const pendingAssistant: ChatEntry = {
       id: generateId(),
@@ -233,6 +263,10 @@ export function ChatExperience() {
 
     const nextConversation = [...conversation, userEntry, pendingAssistant];
     setConversation(nextConversation);
+    setExpandedContextByMessage((current) => ({
+      ...current,
+      [userEntryId]: contextPreviews.length <= 1,
+    }));
     setComposerValue("");
     setIsSending(true);
 
@@ -380,11 +414,70 @@ export function ChatExperience() {
       <div className="chat-container" ref={chatContainerRef}>
         {conversation.map((entry) => {
           if (entry.role === "user") {
+            const contextPreviews = entry.contextPreviews ?? [];
+            const isContextExpanded =
+              expandedContextByMessage[entry.id] ?? contextPreviews.length <= 1;
+            const contextSummary = contextPreviews[0]
+              ? truncateText(
+                  contextPreviews[0].snippet || contextPreviews[0].noteText || "Selected text",
+                  96
+                )
+              : "";
+            const contextLabel =
+              contextPreviews.length === 1
+                ? "1 selected note"
+                : `${contextPreviews.length} selected notes`;
+
             return (
               <div className="chat-message right-bubble" key={entry.id}>
                 <div className="message-bubble bubble-muted">
-                  <div className="message-content user-content" style={{ whiteSpace: "pre-line" }}>
-                    {entry.content}
+                  <div className="message-content user-content">
+                    <p>{entry.displayContent ?? entry.content}</p>
+                    {contextPreviews.length ? (
+                      <div className="user-context-preview" aria-label="Selected context">
+                        <button
+                          className="user-context-toggle"
+                          type="button"
+                          aria-expanded={isContextExpanded}
+                          aria-controls={`context-${entry.id}`}
+                          onClick={() =>
+                            setExpandedContextByMessage((current) => ({
+                              ...current,
+                              [entry.id]: !isContextExpanded,
+                            }))
+                          }
+                        >
+                          <span>
+                            <span className="user-context-label">Selected context</span>
+                            <span className="user-context-count">{contextLabel}</span>
+                          </span>
+                          <span className="user-context-chevron" aria-hidden>
+                            {isContextExpanded ? "−" : "+"}
+                          </span>
+                        </button>
+                        <div id={`context-${entry.id}`}>
+                          {isContextExpanded ? (
+                            <div className="user-context-list">
+                              {contextPreviews.map((context) => (
+                                <div className="user-context-item" key={context.id}>
+                                  {context.snippet ? (
+                                    <blockquote>{context.snippet}</blockquote>
+                                  ) : null}
+                                  {context.noteText ? (
+                                    <div className="user-context-note">
+                                      <span>Note</span>
+                                      {context.noteText}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="user-context-summary">{contextSummary}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -413,6 +506,7 @@ export function ChatExperience() {
               messagePlainText={plainText}
               isAnnotateMode={isAnnotateMode}
               pendingRange={entry.id === activeMessageId ? pendingRange : null}
+              selectionRestoreKey={selectionRestoreKey}
               onSelectRange={(range, pos, selected) =>
                 handleSelectRange(range, pos, selected, entry.id, plainText)
               }
