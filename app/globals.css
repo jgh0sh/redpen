@@ -123,14 +123,6 @@ h1 {
   touch-action: auto;
 }
 
-.assistant-content::selection {
-  background: rgba(0, 122, 255, 0.25);
-}
-
-.assistant-content *::selection {
-  background: rgba(0, 122, 255, 0.25);
-}
-
 .assistant-content .md-heading {
   display: block;
   font-weight: 700;
@@ -572,11 +564,3 @@ h1 {
 }
 
 
-
-.pending-highlight-rect {
-  position: absolute;
-  background: rgba(0, 122, 255, 0.25);
-  pointer-events: none;
-  z-index: 1;
-  border-radius: 0;
-}

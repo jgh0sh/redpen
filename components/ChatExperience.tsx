@@ -109,6 +109,7 @@ export function ChatExperience() {
   const [toolbarNoteText, setToolbarNoteText] = useState("");
   const [composerValue, setComposerValue] = useState<string>("");
   const [toolbarMode, setToolbarMode] = useState<"cta" | "note">("cta");
+  const [selectionRestoreKey, setSelectionRestoreKey] = useState(0);
   const [selectedText, setSelectedText] = useState<string>("");
   type ChatEntry = {
     id: string;
@@ -144,6 +145,7 @@ export function ChatExperience() {
     setToolbarNoteText("");
     setToolbarMode("cta");
     setSelectedText("");
+    setSelectionRestoreKey((key) => key + 1);
     const selection = window.getSelection();
     selection?.removeAllRanges();
   };
@@ -162,6 +164,7 @@ export function ChatExperience() {
     setToolbarMode("cta");
     setToolbarNoteText("");
     setSelectedText(selected);
+    setSelectionRestoreKey((key) => key + 1);
   };
 
   const saveAnnotation = () => {
@@ -195,6 +198,7 @@ export function ChatExperience() {
 
   const beginNote = () => {
     setToolbarMode("note");
+    setSelectionRestoreKey((key) => key + 1);
   };
 
   const deleteAnnotationForMessage = (messageId: string, id: string) => {
@@ -413,6 +417,7 @@ export function ChatExperience() {
               messagePlainText={plainText}
               isAnnotateMode={isAnnotateMode}
               pendingRange={entry.id === activeMessageId ? pendingRange : null}
+              selectionRestoreKey={selectionRestoreKey}
               onSelectRange={(range, pos, selected) =>
                 handleSelectRange(range, pos, selected, entry.id, plainText)
               }
